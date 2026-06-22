@@ -5,6 +5,7 @@
  */
 
 import {
+  AuthCredential,
   Context,
   createRestApiTool,
   RestApiTool,
@@ -562,6 +563,91 @@ describe('RestApiTool', () => {
       }),
     );
   });
+
+  it('should return JSON response if content-type is application/json', async () => {
+    const endpoint = {
+      baseUrl: 'http://api.example.com',
+      path: '/test',
+      method: 'GET',
+    };
+    const operation: OpenAPIV3.OperationObject = {responses: {}};
+    const tool = new RestApiTool(
+      'test_tool',
+      'description',
+      endpoint,
+      operation,
+    );
+
+    const jsonResponse = {result: 'success'};
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      headers: {
+        get: (name: string) =>
+          name === 'content-type' ? 'application/json' : null,
+      },
+      json: async () => jsonResponse,
+    });
+
+    const result = await tool.runAsync({
+      args: {},
+      toolContext: {} as unknown as Context,
+    });
+
+    expect(result).toEqual(jsonResponse);
+  });
+
+  it('should configure auth scheme and credential via setters', async () => {
+    const endpoint = {
+      baseUrl: 'http://api.example.com',
+      path: '/test',
+      method: 'GET',
+    };
+    const operation: OpenAPIV3.OperationObject = {responses: {}};
+    const tool = new RestApiTool(
+      'test_tool',
+      'description',
+      endpoint,
+      operation,
+    );
+
+    const authScheme = {
+      type: 'apiKey',
+      name: 'X-API-Key',
+      in: 'header',
+    } as unknown as OpenAPIV3.SecuritySchemeObject;
+    const authCredential = {apiKey: 'test-key'} as unknown as AuthCredential;
+
+    tool.configureAuthScheme(authScheme);
+    tool.configureAuthCredential(authCredential);
+
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      headers: {get: () => 'text/plain'},
+      text: async () => 'ok',
+    });
+
+    const mockAuthHandler = {
+      prepareAuthCredentials: async () => ({
+        state: 'done',
+        authCredential,
+      }),
+    };
+    const spy = vi
+      .spyOn(ToolAuthHandler, 'fromToolContext')
+      .mockReturnValue(mockAuthHandler as unknown as ToolAuthHandler);
+
+    await tool.runAsync({
+      args: {},
+      toolContext: {} as unknown as Context,
+    });
+
+    expect(spy).toHaveBeenCalledWith(
+      expect.anything(),
+      authScheme,
+      authCredential,
+      expect.anything(),
+    );
+  });
 });
 
 describe('RestApiTool Utilities', () => {
@@ -632,11 +718,37 @@ describe('RestApiTool Utilities', () => {
         'X-Trace-Id': 'trace-456',
       });
     });
+
+    it('should ignore arguments that are not in parameters spec', () => {
+      const endpoint = {
+        baseUrl: 'http://api.example.com',
+        path: '/users/{userId}/posts',
+        method: 'GET',
+      };
+      const parameters = [
+        {
+          name: 'user_id',
+          originalName: 'userId',
+          paramLocation: 'path',
+          paramSchema: {},
+          required: true,
+        },
+      ];
+      const args = {
+        user_id: '123',
+        extra_arg: 'should be ignored',
+      };
+
+      const result = prepareRequestParams(endpoint, parameters, args);
+
+      expect(result.url).toBe('http://api.example.com/users/123/posts');
+      expect(result.headers).toEqual({});
+    });
   });
 
   describe('prepareRequestBody', () => {
     it('should format JSON body correctly', () => {
-      const requestBody = {
+      const requestBody: OpenAPIV3.RequestBodyObject = {
         content: {
           'application/json': {
             schema: {type: 'object'},
@@ -661,6 +773,91 @@ describe('RestApiTool Utilities', () => {
       const headers = {};
 
       const result = prepareRequestBody(undefined, body, bodyData, headers);
+
+      expect(result).toBe(JSON.stringify(body));
+      expect(headers).toEqual({
+        'Content-Type': 'application/json',
+      });
+    });
+
+    it('should fallback to JSON and return string as is if finalData is string', () => {
+      const body = 'plain text body';
+      const bodyData = {};
+      const headers = {};
+
+      const result = prepareRequestBody(undefined, body, bodyData, headers);
+
+      expect(result).toBe(body);
+      expect(headers).toEqual({
+        'Content-Type': 'application/json',
+      });
+    });
+
+    it('should handle unsupported mime type by returning undefined', () => {
+      const requestBody: OpenAPIV3.RequestBodyObject = {
+        content: {
+          'image/png': {
+            schema: {type: 'string', format: 'binary'},
+          },
+        },
+      };
+      const body = 'fake-binary-data';
+      const bodyData = {};
+      const headers = {};
+
+      const result = prepareRequestBody(requestBody, body, bodyData, headers);
+
+      expect(result).toBeUndefined();
+      expect(headers).toEqual({});
+    });
+
+    it('should handle application/json with string body correctly', () => {
+      const requestBody: OpenAPIV3.RequestBodyObject = {
+        content: {
+          'application/json': {
+            schema: {type: 'string'},
+          },
+        },
+      };
+      const body = 'string body';
+      const bodyData = {};
+      const headers = {};
+
+      const result = prepareRequestBody(requestBody, body, bodyData, headers);
+
+      expect(result).toBe(body);
+      expect(headers).toEqual({
+        'Content-Type': 'application/json',
+      });
+    });
+
+    it('should handle text/plain body correctly', () => {
+      const requestBody: OpenAPIV3.RequestBodyObject = {
+        content: {
+          'text/plain': {
+            schema: {type: 'string'},
+          },
+        },
+      };
+      const body = 'plain text';
+      const bodyData = {};
+      const headers = {};
+
+      const result = prepareRequestBody(requestBody, body, bodyData, headers);
+
+      expect(result).toBe('plain text');
+      expect(headers).toEqual({
+        'Content-Type': 'text/plain',
+      });
+    });
+
+    it('should fallback to JSON if requestBody has no content', () => {
+      const requestBody = {} as OpenAPIV3.RequestBodyObject; // defined but no content
+      const body = {foo: 'bar'};
+      const bodyData = {};
+      const headers = {};
+
+      const result = prepareRequestBody(requestBody, body, bodyData, headers);
 
       expect(result).toBe(JSON.stringify(body));
       expect(headers).toEqual({

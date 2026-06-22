@@ -5,6 +5,7 @@
  */
 
 import {
+  AuthConfig,
   createEvent,
   createEventActions,
   getFunctionCalls,
@@ -64,6 +65,19 @@ describe('Event Utils', () => {
     it('returns true if longRunningToolIds is present and not empty', () => {
       const event = createEvent({
         longRunningToolIds: ['tool-id'],
+      });
+      expect(isFinalResponse(event)).toBe(true);
+    });
+
+    it('returns true if requestedAuthConfigs is present and not empty', () => {
+      const event = createEvent({
+        actions: createEventActions({
+          requestedAuthConfigs: {
+            'tool-id': {
+              credentialKey: 'testKey',
+            } as unknown as AuthConfig,
+          },
+        }),
       });
       expect(isFinalResponse(event)).toBe(true);
     });
