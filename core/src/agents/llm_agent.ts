@@ -919,7 +919,7 @@ export class LlmAgent extends BaseAgent {
     // =========================================================================
     // If no model response, skip.
     if (
-      !llmResponse.content &&
+      (!llmResponse.content || llmResponse.content.parts?.length === 0) &&
       !llmResponse.errorCode &&
       !llmResponse.interrupted
     ) {
