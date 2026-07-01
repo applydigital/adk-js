@@ -8,6 +8,7 @@ import {logger} from '../../utils/logger.js';
 import {OAuth2Auth} from '../auth_credential.js';
 
 import {AuthScheme, OpenIdConnectWithConfig} from '../auth_schemes.js';
+import {validateDiscoveryUrl} from './oauth2_discovery.js';
 
 /**
  * Returns the token endpoint for the given auth scheme.
@@ -50,6 +51,13 @@ export async function fetchOAuth2Tokens(
   endpoint: string,
   body: URLSearchParams,
 ): Promise<OAuth2Auth> {
+  // Guard against SSRF: apply the same blocklist used in oauth2_discovery.ts
+  // so callers can't point tokenUrl at a private/cloud-metadata address.
+  if (!validateDiscoveryUrl(endpoint)) {
+    throw new Error(
+      `SSRF protection: OAuth2 token endpoint '${endpoint}' is not allowed. Must use HTTPS and must not target private/loopback/cloud-metadata addresses.`,
+    );
+  }
   try {
     const response = await fetch(endpoint, {
       method: 'POST',
