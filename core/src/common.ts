@@ -47,6 +47,10 @@ export {
   ContentRequestProcessor,
 } from './agents/processors/content_request_processor.js';
 export {ContextCompactorRequestProcessor} from './agents/processors/context_compactor_request_processor.js';
+export {
+  INTERACTIONS_REQUEST_PROCESSOR,
+  InteractionsRequestProcessor,
+} from './agents/processors/interactions_request_processor.js';
 export {ReadonlyContext} from './agents/readonly_context.js';
 export {RoutedAgent, isRoutedAgent} from './agents/routed_agent.js';
 export type {AgentRouter, RoutedAgentConfig} from './agents/routed_agent.js';
@@ -63,6 +67,11 @@ export type {
   SaveArtifactRequest,
 } from './artifacts/base_artifact_service.js';
 export {InMemoryArtifactService} from './artifacts/in_memory_artifact_service.js';
+export type {
+  SessionArtifactService,
+  SessionLoadArtifactRequest,
+  SessionSaveArtifactRequest,
+} from './artifacts/session_artifact_service.js';
 export {AuthCredentialTypes} from './auth/auth_credential.js';
 export type {
   AuthCredential,
@@ -107,6 +116,8 @@ export {LlmSummarizer} from './context/summarizers/llm_summarizer.js';
 export type {LlmSummarizerOptions} from './context/summarizers/llm_summarizer.js';
 export {TokenBasedContextCompactor} from './context/token_based_context_compactor.js';
 export type {TokenBasedContextCompactorOptions} from './context/token_based_context_compactor.js';
+export {TrajectoryThoughtPruningCompactor} from './context/trajectory_thought_pruning_compactor.js';
+export type {TrajectoryThoughtPruningCompactorOptions} from './context/trajectory_thought_pruning_compactor.js';
 export {TruncatingContextCompactor} from './context/truncating_context_compactor.js';
 export type {TruncatingContextCompactorOptions} from './context/truncating_context_compactor.js';
 export {isCompactedEvent} from './events/compacted_event.js';
