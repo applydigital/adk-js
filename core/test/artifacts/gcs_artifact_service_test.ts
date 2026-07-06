@@ -5,7 +5,7 @@
  */
 
 import {GcsArtifactService} from '@google/adk';
-import {describe, vi} from 'vitest';
+import {describe, expect, it, vi} from 'vitest';
 import {runArtifactServiceTests} from './artifact_service_test_utils.js';
 
 const {StorageMock, storageMock} = vi.hoisted(() => {
@@ -17,12 +17,15 @@ const {StorageMock, storageMock} = vi.hoisted(() => {
 
     async save(
       data: string | Buffer,
-      options?: {contentType?: string; metadata?: Record<string, unknown>},
+      options?: {
+        contentType?: string;
+        metadata?: {contentType?: string; metadata?: Record<string, unknown>};
+      },
     ): Promise<void> {
       this.bucket.files.set(this.name, {
         data: Buffer.isBuffer(data) ? data : Buffer.from(data),
-        metadata: options?.metadata || {},
-        contentType: options?.contentType,
+        metadata: options?.metadata?.metadata || {},
+        contentType: options?.metadata?.contentType ?? options?.contentType,
       });
     }
 
@@ -112,4 +115,27 @@ describe('GcsArtifactService', () => {
       storageMock.buckets.clear();
     },
   );
+
+  describe('customMetadata GCS shape', () => {
+    it('stores customMetadata nested under metadata.metadata, not flat', async () => {
+      storageMock.buckets.clear();
+      const service = new GcsArtifactService(bucketName);
+
+      await service.saveArtifact({
+        appName: 'test-app',
+        userId: 'test-user',
+        sessionId: 'test-session',
+        filename: 'meta.txt',
+        artifact: {text: 'hello'},
+        customMetadata: {foo: 'bar'},
+      });
+
+      const entry = storageMock
+        .bucket(bucketName)
+        .files.get('test-app/test-user/test-session/meta.txt/0');
+
+      expect(entry).toBeDefined();
+      expect(entry?.metadata).toEqual({foo: 'bar'});
+    });
+  });
 });
