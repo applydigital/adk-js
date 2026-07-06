@@ -39,14 +39,14 @@ export class GcsArtifactService implements BaseArtifactService {
       }),
     );
 
-    const metadata = request.customMetadata || {};
+    const customMetadata = request.customMetadata || {};
 
     if (request.artifact.inlineData) {
       await file.save(
         Buffer.from(request.artifact.inlineData.data || '', 'base64'),
         {
           contentType: request.artifact.inlineData.mimeType,
-          metadata,
+          metadata: {metadata: customMetadata},
         },
       );
 
@@ -55,7 +55,7 @@ export class GcsArtifactService implements BaseArtifactService {
 
     await file.save(request.artifact.text!, {
       contentType: 'text/plain',
-      metadata,
+      metadata: {metadata: customMetadata},
     });
 
     return version;
