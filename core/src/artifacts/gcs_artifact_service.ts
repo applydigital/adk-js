@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {Bucket, File, Storage} from '@google-cloud/storage';
+import {Bucket, File, Storage, StorageOptions} from '@google-cloud/storage';
 import {createPartFromBase64, createPartFromText, Part} from '@google/genai';
 import {logger} from '../utils/logger.js';
 
@@ -21,8 +21,8 @@ import {
 export class GcsArtifactService implements BaseArtifactService {
   private readonly bucket: Bucket;
 
-  constructor(bucket: string) {
-    this.bucket = new Storage().bucket(bucket);
+  constructor(bucket: string, options?: StorageOptions) {
+    this.bucket = new Storage(options).bucket(bucket);
   }
 
   async saveArtifact(request: SaveArtifactRequest): Promise<number> {
