@@ -6,10 +6,18 @@
 
 import {InMemoryArtifactService} from '@google/adk';
 import {describe} from 'vitest';
-import {runArtifactServiceTests} from './artifact_service_test_utils.js';
+import {
+  runArtifactServiceTests,
+  runFileDataArtifactServiceTests,
+} from './artifact_service_test_utils.js';
 
 describe('InMemoryArtifactService', () => {
   runArtifactServiceTests(
+    async () => new InMemoryArtifactService(),
+    async () => {},
+  );
+
+  runFileDataArtifactServiceTests(
     async () => new InMemoryArtifactService(),
     async () => {},
   );
