@@ -18,6 +18,11 @@ import {
   SaveArtifactRequest,
 } from './base_artifact_service.js';
 
+const GCS_FILE_URI_METADATA_KEY = 'adkFileUri';
+const GCS_FILE_MIME_TYPE_METADATA_KEY = 'adkFileMimeType';
+const GCS_DISPLAY_NAME_METADATA_KEY = 'adkDisplayName';
+const GCS_IS_TEXT_METADATA_KEY = 'adkIsText';
+
 export class GcsArtifactService implements BaseArtifactService {
   private readonly bucket: Bucket;
 
@@ -26,7 +31,11 @@ export class GcsArtifactService implements BaseArtifactService {
   }
 
   async saveArtifact(request: SaveArtifactRequest): Promise<number> {
-    if (!request.artifact.inlineData && !request.artifact.text) {
+    if (
+      !request.artifact.inlineData &&
+      !request.artifact.text &&
+      !request.artifact.fileData
+    ) {
       throw new Error('Artifact must have either inlineData or text content.');
     }
 
@@ -39,9 +48,15 @@ export class GcsArtifactService implements BaseArtifactService {
       }),
     );
 
-    const customMetadata = request.customMetadata || {};
+    const customMetadata: Record<string, unknown> = {
+      ...request.customMetadata,
+    };
 
     if (request.artifact.inlineData) {
+      if (request.artifact.inlineData.displayName) {
+        customMetadata[GCS_DISPLAY_NAME_METADATA_KEY] =
+          request.artifact.inlineData.displayName;
+      }
       await file.save(
         Buffer.from(request.artifact.inlineData.data || '', 'base64'),
         {
@@ -51,14 +66,32 @@ export class GcsArtifactService implements BaseArtifactService {
       );
 
       return version;
+    } else if (request.artifact.text !== undefined) {
+      await file.save(request.artifact.text, {
+        contentType: 'text/plain',
+        metadata: {
+          metadata: {...customMetadata, [GCS_IS_TEXT_METADATA_KEY]: 'true'},
+        },
+      });
+
+      return version;
+    } else {
+      const fileData = request.artifact.fileData;
+      const fileUri = fileData?.fileUri;
+      if (!fileUri) {
+        throw new Error('Artifact fileData must have a fileUri.');
+      }
+      // Store the URI and mime_type (if any) as blob metadata; no content to upload.
+      customMetadata[GCS_FILE_URI_METADATA_KEY] = fileUri;
+      if (fileData.mimeType) {
+        customMetadata[GCS_FILE_MIME_TYPE_METADATA_KEY] = fileData.mimeType;
+      }
+      await file.save('', {
+        contentType: fileData.mimeType || undefined,
+        metadata: {metadata: customMetadata},
+      });
+      return version;
     }
-
-    await file.save(request.artifact.text!, {
-      contentType: 'text/plain',
-      metadata: {metadata: customMetadata},
-    });
-
-    return version;
   }
 
   async loadArtifact(request: LoadArtifactRequest): Promise<Part | undefined> {
@@ -80,12 +113,39 @@ export class GcsArtifactService implements BaseArtifactService {
           version,
         }),
       );
-      const [[metadata], [rawDataBuffer]] = await Promise.all([
-        file.getMetadata(),
-        file.download(),
-      ]);
+      const [metadata] = await file.getMetadata();
+      const customMeta = (metadata.metadata ?? {}) as Record<string, unknown>;
+      const fileUri = customMeta[GCS_FILE_URI_METADATA_KEY] as
+        | string
+        | undefined;
 
-      if (metadata.contentType === 'text/plain') {
+      if (fileUri) {
+        const mimeType =
+          (customMeta[GCS_FILE_MIME_TYPE_METADATA_KEY] as string | undefined) ??
+          metadata.contentType ??
+          undefined;
+        return {fileData: {fileUri, mimeType}};
+      }
+
+      const [rawDataBuffer] = await file.download();
+
+      const displayName = customMeta[GCS_DISPLAY_NAME_METADATA_KEY] as
+        | string
+        | undefined;
+      if (displayName) {
+        return {
+          inlineData: {
+            data: rawDataBuffer.toString('base64'),
+            mimeType: metadata.contentType,
+            displayName,
+          },
+        };
+      }
+
+      if (
+        customMeta[GCS_IS_TEXT_METADATA_KEY] === 'true' ||
+        metadata.contentType === 'text/plain'
+      ) {
         return createPartFromText(rawDataBuffer.toString('utf-8'));
       }
 
