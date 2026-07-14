@@ -448,9 +448,8 @@ export function runArtifactServiceTests(
 /**
  * Runs the shared fileData tests.
  *
- * These tests exercise the fileData support added to GcsArtifactService and
- * InMemoryArtifactService: saving/loading external URI references (e.g.
- * gs://) as-is.
+ * These tests exercise fileData Part support:
+ * saving/loading external URI references (e.g. gs://) as-is.
  *
  * @param createService A function that returns a promise that resolves to the artifact service.
  * @param cleanup A function that returns a promise that cleans up the artifact service.
