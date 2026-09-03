@@ -61,7 +61,7 @@
     "@opentelemetry/sdk-trace-base": "^2.1.0",
     "@opentelemetry/sdk-trace-node": "^2.1.0",
     "adm-zip": "^0.5.17",
-    "express": "^4.22.1",
+    "express": "^5.2.1",
     "google-auth-library": "^10.3.0",
     "js-yaml": "^4.1.1",
     "jsonpath-plus": "^10.4.0",
